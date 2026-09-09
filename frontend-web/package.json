@@ -1,0 +1,21 @@
+{
+  "name": "station-master-command-center",
+  "private": true,
+  "scripts": {
+    "dev": "python run.py",
+    "start": "python run.py",
+    "test": "python test_command_center.py"
+  },
+  "dependencies": {
+    "next": "14.2.15",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zustand": "4.5.5"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.12",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "typescript": "5.5.4"
+  }
+}
