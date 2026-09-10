@@ -43,7 +43,7 @@ jobs:
         working-directory: backend-api
         run: |
           if [ -d "tests" ]; then
-            pytest -v
+            python -m pytest -v
           else
             echo "No tests directory found. Skipping tests."
           fi
