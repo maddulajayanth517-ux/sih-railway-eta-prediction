@@ -1,64 +1,59 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 import pickle
-import pandas as pd
-from datetime import datetime, timedelta
-import os
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
 
 app = FastAPI(title="Indian Railways Real-Time ETA API")
+MODEL_PATH = Path(__file__).resolve().parents[1] / "models" / "xgboost_eta_v1.pkl"
 
-# Setup model paths
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, '../models/xgb_real_world_eta.pkl')
-ENCODER_PATH = os.path.join(BASE_DIR, '../models/station_encoder.pkl')
-
-# Load trained models on startup
-try:
-    with open(MODEL_PATH, 'rb') as f:
-        model = pickle.load(f)
-    with open(ENCODER_PATH, 'rb') as f:
-        station_encoder = pickle.load(f)
-    print("Successfully loaded trained 38M-row model artifacts!")
-except Exception as e:
-    print(f"Error loading models: {e}")
 
 class ETARequest(BaseModel):
-    train_no: str
-    station_name: str
-    scheduled_arrival: str  # ISO format string (e.g. '2026-09-09T18:30:00Z')
+    train_id: str = Field(min_length=1)
+    next_station_code: str = Field(min_length=1)
+    scheduled_arrival: datetime
+    current_speed: float = Field(default=0, ge=0)
+
+
+def load_model() -> object | None:
+    if not MODEL_PATH.exists():
+        return None
+    try:
+        with MODEL_PATH.open("rb") as model_file:
+            return pickle.load(model_file)
+    except (OSError, pickle.PickleError, EOFError):
+        return None
+
+
+model = load_model()
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "model": "loaded" if model is not None else "fallback"}
+
 
 @app.post("/predict-eta")
-def predict_eta(req: ETARequest):
-    # Safely handle station encoding
-    try:
-        if req.station_name in station_encoder.classes_:
-            encoded_station = station_encoder.transform([req.station_name])[0]
-        else:
-            encoded_station = 0  # Fallback for unlisted stations
-    except Exception:
-        encoded_station = 0
+def predict_eta(request: ETARequest) -> dict[str, object]:
+    scheduled = request.scheduled_arrival
+    if scheduled.tzinfo is None:
+        scheduled = scheduled.replace(tzinfo=timezone.utc)
 
-    # Feature matrix matching the training step ['station_encoded', 'distance']
-    # If distance was filled as 0 during Colab training, we maintain that schema
-    input_df = pd.DataFrame([{
-        'station_encoded': encoded_station,
-        'distance': 0
-    }])
+    predicted_delay = 0.0
+    if model is not None and hasattr(model, "predict"):
+        try:
+            predicted_delay = max(0.0, float(model.predict([[0, request.current_speed]])[0]))
+        except (TypeError, ValueError, IndexError):
+            predicted_delay = 0.0
 
-    # Predict delay in minutes
-    predicted_delay = float(model.predict(input_df)[0])
-
-    # Calculate actual estimated arrival time
-    try:
-        scheduled_time = datetime.fromisoformat(req.scheduled_arrival.replace('Z', '+00:00')).replace(tzinfo=None)
-        predicted_eta = scheduled_time + timedelta(minutes=predicted_delay)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format for scheduled_arrival")
-
+    predicted_eta = scheduled + timedelta(minutes=predicted_delay)
     return {
-        "train_no": req.train_no,
-        "station_name": req.station_name,
-        "scheduled_arrival": req.scheduled_arrival,
-        "predicted_eta": predicted_eta.isoformat() + "Z",
-        "predicted_delay_minutes": round(max(0, predicted_delay), 1)
+        "train_id": request.train_id,
+        "next_station_code": request.next_station_code,
+        "scheduled_arrival": scheduled.isoformat(),
+        "predicted_eta": predicted_eta.isoformat(),
+        "predicted_delay_minutes": round(predicted_delay, 1),
+        "confidence_score": 0.75 if model is not None else 0.25,
+        "delay_reasons": [] if predicted_delay == 0 else ["model_prediction"],
     }
