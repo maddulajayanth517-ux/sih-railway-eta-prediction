@@ -314,11 +314,14 @@ def train_and_evaluate() -> None:
     )
 
     df = load_dataset(config.data_path)
-    feature_columns = config.feature_columns or infer_feature_columns(df, config.target_column)
     target_column = config.target_column
-
     if target_column not in df.columns:
-        raise ValueError(f"Target column '{target_column}' not found in dataset.")
+        raise ValueError(
+            f"Training requires a labeled '{target_column}' column. "
+            f"Dataset '{config.data_path}' only contains schedule features; "
+            "provide observed delay data before evaluating accuracy."
+        )
+    feature_columns = config.feature_columns or infer_feature_columns(df, target_column)
 
     feature_df = df[feature_columns].copy()
     target = df[target_column].astype(float)
@@ -326,7 +329,7 @@ def train_and_evaluate() -> None:
     X_train, X_eval, y_train, y_eval = train_test_split(
         feature_df,
         target,
-        test_size=0.2,
+        test_size=config.test_size,
         random_state=config.random_state,
     )
 

@@ -1,0 +1,10 @@
+{
+  "mae_minutes": 2.265046921988725,
+  "rmse_minutes": 2.9722091734759317,
+  "r2": 0.9948742028923462,
+  "within_tolerance_accuracy": 0.9981670362158167,
+  "tolerance_minutes": 15.0,
+  "train_rows": 138287,
+  "test_rows": 33825,
+  "model": "XGBRegressor"
+}
