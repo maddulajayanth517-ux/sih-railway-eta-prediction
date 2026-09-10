@@ -1,6 +1,19 @@
+node_modules/
+.next/
+*.log
 __pycache__/
 *.py[cod]
+.pytest_cache/
 .venv/
 venv/
-env/
 .env
+
+# Generated ML artifacts and local data
+ml-engine/data/*
+!ml-engine/data/sample_delays.csv
+ml-engine/models/*
+!ml-engine/models/xgboost_eta_v1.pkl
+
+# Local editor and notebook runtime files
+.vscode/
+.ipynb_checkpoints/
