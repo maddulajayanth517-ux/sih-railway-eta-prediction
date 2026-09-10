@@ -62,6 +62,7 @@ import math
 import os
 import random
 import signal
+import sys
 import time
 import uuid
 
@@ -69,9 +70,18 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-import httpx
-from aiokafka import AIOKafkaProducer
-from pydantic import BaseModel, Field, ValidationError
+try:
+    import httpx
+    from aiokafka import AIOKafkaProducer
+    from pydantic import BaseModel, Field, ValidationError
+except ModuleNotFoundError as exc:
+    print(
+        "Missing Python dependency: "
+        f"{exc.name}. Install simulator dependencies with:\n"
+        "  python -m pip install -r data-simulator/requirements.txt",
+        file=sys.stderr,
+    )
+    raise SystemExit(1) from exc
 
 
 # ============================================================================
@@ -86,6 +96,9 @@ logging.basicConfig(
         "%(name)s | "
         "%(message)s"
     ),
+    # Some IDE run configurations install a root logger first. Force this
+    # script's logger so its startup/progress messages remain visible.
+    force=True,
 )
 
 logger = logging.getLogger("railway-gps-ingestion")
